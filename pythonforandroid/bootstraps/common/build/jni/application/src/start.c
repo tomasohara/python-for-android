@@ -195,9 +195,14 @@ int main(int argc, char *argv[]) {
   #if PY_MAJOR_VERSION >= 3
 
     #if PY_MINOR_VERSION >= P4A_MIN_VER
+      // See https://docs.python.org/3/c-api/init_config.html
       PyConfig config;
       PyConfig_InitPythonConfig(&config);
       config.program_name = L"android_python";
+      // TPO: force UTF-8 and verbose mode (via Gemini)
+      // TEST:
+      // config.utf8_mode = 1;
+      // config.verbose = 1;
     #else
       Py_SetProgramName(L"android_python");
     #endif
@@ -450,7 +455,7 @@ JNIEXPORT void JNICALL Java_org_kivy_android_PythonService_nativeStart(
   setenv("PYTHON_SERVICE_ARGUMENT", arg, 1);
   setenv("P4A_BOOTSTRAP", bootstrap_name, 1);
   setenv("PYTHONPATH", python_path, 1);
-  /* TPO: force UTF-8 and run python in debug mode
+  /* TPO: force UTF-8 and run python in verbose mode (a la -v)
      note: via setenv(3): int setenv(const char *name, const char *value, int overwrite);
    */
   setenv("PYTHONUTF8", "1", 1);
