@@ -199,10 +199,15 @@ int main(int argc, char *argv[]) {
       PyConfig config;
       PyConfig_InitPythonConfig(&config);
       config.program_name = L"android_python";
+      
       // TPO: force UTF-8 and verbose mode (via Gemini)
       // TEST:
-      // config.utf8_mode = 1;
-      // config.verbose = 1;
+      PyPreConfig preconfig;
+      PyPreConfig_InitPythonConfig(&preconfig);
+      preconfig.utf8_mode = 1;
+      Py_PreInitialize(&preconfig);
+      //
+      config.verbose = 1;
     #else
       Py_SetProgramName(L"android_python");
     #endif
