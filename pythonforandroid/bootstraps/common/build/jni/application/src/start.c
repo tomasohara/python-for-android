@@ -59,6 +59,50 @@ PyMODINIT_FUNC initandroidembed(void) {
 }
 #endif
 
+static void load_env_vars(const char *env_file_path) {
+  FILE *env_file_fd = fopen(env_file_path, "r");
+  if (env_file_fd) {
+    LOGP("Setting additional env vars from:");
+    LOGP(env_file_path);
+    char* line = NULL;
+    size_t len = 0;
+    while (getline(&line, &len, env_file_fd) != -1) {
+      LOGP(line);
+      if (strlen(line) > 0) {
+        char *eqsubstr = strstr(line, "=");
+        if (eqsubstr) {
+          size_t eq_pos = eqsubstr - line;
+
+          // Extract name:
+          char env_name[256];
+          strncpy(env_name, line, sizeof(env_name));
+          env_name[eq_pos] = '\0';
+
+          // Extract value (with line break removed):
+          char env_value[256];
+          strncpy(env_value, (char*)(line + eq_pos + 1), sizeof(env_value));
+          if (strlen(env_value) > 0 &&
+              env_value[strlen(env_value)-1] == '\n') {
+            env_value[strlen(env_value)-1] = '\0';
+            if (strlen(env_value) > 0 &&
+                env_value[strlen(env_value)-1] == '\r') {
+              // Also remove windows line breaks (\r\n)
+              env_value[strlen(env_value)-1] = '\0';
+            } 
+          }
+
+          // Set value:
+          setenv(env_name, env_value, 1);
+        }
+      }
+    }
+    fclose(env_file_fd);
+  } else {
+    LOGP("Warning: no env vars file found / failed to open:");
+    LOGP(env_file_path);
+  }
+}
+
 int dir_exists(char *filename) {
   struct stat st;
   if (stat(filename, &st) == 0) {
@@ -87,6 +131,7 @@ int main(int argc, char *argv[]) {
   int ret = 0;
   FILE *fd;
 
+  LOGP("in my-python-for-android start.c");
   LOGP("Initializing Python for Android");
 
   // Set a couple of built-in environment vars:
@@ -105,46 +150,22 @@ int main(int argc, char *argv[]) {
   }
 
   // Set additional file-provided environment vars:
-  LOGP("Setting additional env vars from p4a_env_vars.txt");
   char env_file_path[256];
-  snprintf(env_file_path, sizeof(env_file_path),
-           "%s/p4a_env_vars.txt", getenv("ANDROID_UNPACK"));
-  FILE *env_file_fd = fopen(env_file_path, "r");
-  if (env_file_fd) {
-    char* line = NULL;
-    size_t len = 0;
-    while (getline(&line, &len, env_file_fd) != -1) {
-      if (strlen(line) > 0) {
-        char *eqsubstr = strstr(line, "=");
-        if (eqsubstr) {
-          size_t eq_pos = eqsubstr - line;
+  snprintf(env_file_path, sizeof(env_file_path), "%s/.p4a_env_vars", getenv("ANDROID_UNPACK"));
+  load_env_vars(env_file_path);
 
-          // Extract name:
-          char env_name[256];
-          strncpy(env_name, line, sizeof(env_name));
-          env_name[eq_pos] = '\0';
+  snprintf(env_file_path, sizeof(env_file_path), "%s/p4a_env_vars.txt", getenv("ANDROID_UNPACK"));
+  load_env_vars(env_file_path);
 
-          // Extract value (with line break removed:
-          char env_value[256];
-          strncpy(env_value, (char*)(line + eq_pos + 1), sizeof(env_value));
-          if (strlen(env_value) > 0 &&
-              env_value[strlen(env_value)-1] == '\n') {
-            env_value[strlen(env_value)-1] = '\0';
-            if (strlen(env_value) > 0 &&
-                env_value[strlen(env_value)-1] == '\r') {
-              // Also remove windows line breaks (\r\n)
-              env_value[strlen(env_value)-1] = '\0';
-            } 
-          }
-
-          // Set value:
-          setenv(env_name, env_value, 1);
-        }
-      }
+  /* Dump out entire environment */
+  {
+    extern char **environ;
+    char **env = environ;
+    LOGP("Dumping C environment variables:");
+    while (*env) {
+      LOGP(*env);
+      env++;
     }
-    fclose(env_file_fd);
-  } else {
-    LOGP("Warning: no p4a_env_vars.txt found / failed to open!");
   }
 
   LOGP("Changing directory to the one provided by ANDROID_ARGUMENT");
@@ -281,8 +302,9 @@ int main(int argc, char *argv[]) {
       "        self.__buffer = lines[-1]\n"
       "sys.stdout = sys.stderr = LogFile()\n"
       "print('Android path', sys.path)\n"
-      "# import os\n"
-      "# print('os.environ is', os.environ)\n"
+      "## DEBUG:\n"
+      "import os\n"
+      "print('os.environ is', os.environ)\n"
       "print('Android kivy bootstrap done. __name__ is', __name__)");
 
 #if PY_MAJOR_VERSION < 3
@@ -427,6 +449,12 @@ JNIEXPORT void JNICALL Java_org_kivy_android_PythonService_nativeStart(
   setenv("PYTHONPATH", python_path, 1);
   setenv("PYTHON_SERVICE_ARGUMENT", arg, 1);
   setenv("P4A_BOOTSTRAP", bootstrap_name, 1);
+  setenv("PYTHONPATH", python_path, 1);
+  /* TPO: force UTF-8 and run python in debug mode
+     note: via setenv(3): int setenv(const char *name, const char *value, int overwrite);
+   */
+  setenv("PYTHONUTF8", "1", 1);
+  setenv("PYTHONVERBOSE", "1", 1);
 
   char *argv[] = {"."};
   /* ANDROID_ARGUMENT points to service subdir,
