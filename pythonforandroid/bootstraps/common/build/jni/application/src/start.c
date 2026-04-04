@@ -33,6 +33,17 @@
 #define LOGP(x) LOG("python", (x))
 #define P4A_MIN_VER 11
 
+/* P4A_DEBUG: enables experimental/diagnostic code blocks.
+ * Set here or pass -DP4A_DEBUG via LOCAL_CFLAGS in Android.mk.
+ * Comment out this define (or remove -DP4A_DEBUG) for a clean production build.
+ * note: unlike CPython's compile-time Py_DEBUG (which rebuilds the interpreter
+ *   with assertions + memory checks), this only gates runtime config options
+ *   such as Py_PreInitialize() and config.faulthandler.
+ *   For closer-to-Py_DEBUG diagnostics at runtime, config.faulthandler = 1
+ *   prints a Python-level traceback on SIGSEGV/SIGABRT (see below).
+ */
+#define P4A_DEBUG 1
+
 static PyObject *androidembed_log(PyObject *self, PyObject *args) {
   char *logstr = NULL;
   if (!PyArg_ParseTuple(args, "s", &logstr)) {
@@ -202,12 +213,29 @@ int main(int argc, char *argv[]) {
       
       // TPO: force UTF-8 and verbose mode (via Gemini)
       // TEST:
+#ifdef P4A_DEBUG
+      /* Experimental: force UTF-8 pre-init and enable verbose/faulthandler.
+       * WARNING: Py_PreInitialize() must be called BEFORE PyConfig_InitPythonConfig()
+       * per Python docs. This block violates that order (PyConfig_InitPythonConfig
+       * is called just above) which can corrupt config.module_search_paths and
+       * cause "failed to get the Python codec of the filesystem encoding".
+       * Kept here for investigation only; disable P4A_DEBUG for production builds.
+       * note: PYTHONUTF8=1 is already set via load_env_vars() above, so
+       *   PyConfig_InitPythonConfig() picks it up from the environment without
+       *   needing Py_PreInitialize().
+       * note: config.faulthandler=1 is the closest runtime analog to Py_DEBUG --
+       *   it installs signal handlers that print a Python-level traceback on
+       *   SIGSEGV/SIGABRT (vs Py_DEBUG which recompiles the interpreter with
+       *   assertions and memory-allocation checks).
+       */
       PyPreConfig preconfig;
       PyPreConfig_InitPythonConfig(&preconfig);
       preconfig.utf8_mode = 1;
       Py_PreInitialize(&preconfig);
       //
       config.verbose = 1;
+      config.faulthandler = 1;
+#endif  /* P4A_DEBUG */
     #else
       Py_SetProgramName(L"android_python");
     #endif
