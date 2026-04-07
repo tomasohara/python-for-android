@@ -379,7 +379,9 @@ class Python3Recipe(TargetPythonRecipe):
             longer used...uses .pyc (https://www.python.org/dev/peps/pep-0488)
         '''
         args = [self.ctx.hostpython]
-        args += ['-OO', '-m', 'compileall', '-b', '-f', dir]
+        ## OLD: args += ['-OO', '-m', 'compileall', '-b', '-f', dir]
+        # Note: -OO strips 'if __debug__:' blocks at compile time, disabling mezcla debug tracing
+        args += ['-m', 'compileall', '-b', '-f', dir]
         subprocess.call(args)
 
     def create_python_bundle(self, dirn, arch):
