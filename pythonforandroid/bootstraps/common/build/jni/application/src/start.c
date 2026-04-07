@@ -210,6 +210,13 @@ int main(int argc, char *argv[]) {
       PyConfig config;
       PyConfig_InitPythonConfig(&config);
       config.program_name = L"android_python";
+      /* TPO: force optimization_level=0 so __debug__=True and if __debug__: blocks run.
+       * PythonActivity.java sets PYTHONOPTIMIZE=2, but Python 3.11 inlines __debug__
+       * as a compile-time constant so PYTHONOPTIMIZE at runtime doesn't help for
+       * already-compiled .pyc files. This explicit config override is definitive.
+       * See also: build.py compile_py_file() fix (removed -OO compile flag).
+       */
+      config.optimization_level = 0;
       
       // TPO: force UTF-8 and verbose mode (via Gemini)
       // TEST:

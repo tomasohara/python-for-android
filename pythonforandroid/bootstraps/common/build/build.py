@@ -207,9 +207,11 @@ def compile_py_file(python_file, optimize_python=True):
         return
 
     args = [PYTHON, '-m', 'compileall', '-b', '-f', python_file]
-    if optimize_python:
-        # -OO = strip docstrings
-        args.insert(1, '-OO')
+    ## OLD: -OO hardcodes __debug__=False at compile time; Python 3.11 inlines
+    ## __debug__ as a compile-time constant so PYTHONOPTIMIZE=0 at runtime can't fix it.
+    ## if optimize_python:
+    ##     # -OO = strip docstrings
+    ##     args.insert(1, '-OO')
     return_code = subprocess.call(args)
 
     if return_code != 0:
