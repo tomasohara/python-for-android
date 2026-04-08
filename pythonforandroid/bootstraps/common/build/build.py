@@ -207,11 +207,11 @@ def compile_py_file(python_file, optimize_python=True):
         return
 
     args = [PYTHON, '-m', 'compileall', '-b', '-f', python_file]
-    ## OLD: -OO hardcodes __debug__=False at compile time; Python 3.11 inlines
-    ## __debug__ as a compile-time constant so PYTHONOPTIMIZE=0 at runtime can't fix it.
-    ## if optimize_python:
-    ##     # -OO = strip docstrings
-    ##     args.insert(1, '-OO')
+    if optimize_python:
+        # -OO = strip docstrings and optimize; note: Python 3.11 inlines
+        # __debug__ as a compile-time constant so -OO causes __debug__=False.
+        # Set NO_OPTIMIZE_PYTHON=1 (or pass --no-optimize-python) to disable.
+        args.insert(1, '-OO')
     return_code = subprocess.call(args)
 
     if return_code != 0:
@@ -966,10 +966,14 @@ tools directory of the Android SDK.
     ap.add_argument('--no-byte-compile-python', dest='byte_compile_python',
                     action='store_false', default=True,
                     help='Skip byte compile for .py files.')
+    # NO_OPTIMIZE_PYTHON env var acts as if --no-optimize-python was passed;
+    # this lets p4a_hook.py (or the user's shell) disable -OO without patching.
+    _default_optimize = not bool(environ.get('NO_OPTIMIZE_PYTHON'))
     ap.add_argument('--no-optimize-python', dest='optimize_python',
-                    action='store_false', default=True,
+                    action='store_false', default=_default_optimize,
                     help=('Whether to compile to optimised .pyc files, using -OO '
-                          '(strips docstrings and asserts)'))
+                          '(strips docstrings and asserts). '
+                          'Also controlled by NO_OPTIMIZE_PYTHON env var.'))
     ap.add_argument('--extra-manifest-xml', default='',
                     help=('Extra xml to write directly inside the <manifest> element of'
                           'AndroidManifest.xml'))
